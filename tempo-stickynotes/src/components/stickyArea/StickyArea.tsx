@@ -13,7 +13,7 @@ const Status = {
 
 type Status = (typeof Status)[keyof typeof Status]
 
-const EDGE_SIZE = 8
+const EDGE_SIZE = 15
 
 function StickyArea() {
   const [status, setStatus] = useState<Status>(Status.Idle)
@@ -23,12 +23,15 @@ function StickyArea() {
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
 
-    const updatedStatus = updateStatus(event.clientX, event.clientY)
+    const { status: updatedStatus, allResized } = updateStatus(
+      event.clientX,
+      event.clientY,
+    )
 
     if (updatedStatus === Status.Creating) {
       const note = {
         id: Date.now(),
-        isFocus: true,
+        isSelect: false,
         start: {
           x: event.clientX,
           y: event.clientY,
@@ -36,6 +39,11 @@ function StickyArea() {
         stop: {} as Position,
       } as Note
       setFocusNote(note)
+    } else if (updatedStatus === Status.Resizing && allResized.length > 0) {
+      const newFocusNote = allResized[0]
+      newFocusNote.isSelect = true
+      setFocusNote(newFocusNote)
+      updateNoteByID(newFocusNote.id, newFocusNote)
     }
   }
 
@@ -61,11 +69,27 @@ function StickyArea() {
       if (status === Status.Creating) {
         setStickyNotes([...stickyNotes, note])
         setFocusNote(undefined)
+      } else if (status === Status.Resizing) {
+        note.isSelect = false
+        updateNoteByID(focusNote.id, note)
+        setFocusNote(undefined)
       }
     }
   }
 
-  const updateStatus = (cursorX: number, cursorY: number) => {
+  const updateNoteByID = (targetID: number, updatedNote: Note) => {
+    const allNoteClone = [...stickyNotes]
+    const targetIndex = allNoteClone.findIndex((n) => n.id === targetID)
+    if (targetIndex === -1) return
+
+    allNoteClone[targetIndex] = { ...updatedNote }
+    setStickyNotes(allNoteClone)
+  }
+
+  const updateStatus = (
+    cursorX: number,
+    cursorY: number,
+  ): { status: Status; allFocus: Note[]; allResized: Note[] } => {
     const targetingResult = identifyNote(cursorX, cursorY)
     let newStatus: Status = Status.Creating
 
@@ -75,7 +99,7 @@ function StickyArea() {
       newStatus = Status.Moving
     }
     setStatus(newStatus)
-    return newStatus
+    return { status: newStatus, ...targetingResult }
   }
 
   const identifyNote = (
@@ -97,18 +121,25 @@ function StickyArea() {
       }
     })
 
-    const allResizedNote = allFocusNote.filter((note) => {
+    const allResizedNote = stickyNotes.filter((note) => {
       const left = Math.min(note.start.x, note.stop.x)
       const right = Math.max(note.start.x, note.stop.x)
       const top = Math.min(note.start.y, note.stop.y)
       const bottom = Math.max(note.start.y, note.stop.y)
 
-      return (
-        cursorX - left <= EDGE_SIZE ||
-        right - cursorX <= EDGE_SIZE ||
-        cursorY - top <= EDGE_SIZE ||
-        bottom - cursorY <= EDGE_SIZE
-      )
+      const inOuterBox =
+        cursorX >= left - EDGE_SIZE &&
+        cursorX <= right + EDGE_SIZE &&
+        cursorY >= top - EDGE_SIZE &&
+        cursorY <= bottom + EDGE_SIZE
+
+      const inInnerBox =
+        cursorX > left + EDGE_SIZE &&
+        cursorX < right - EDGE_SIZE &&
+        cursorY > top + EDGE_SIZE &&
+        cursorY < bottom - EDGE_SIZE
+
+      return inOuterBox && !inInnerBox
     })
 
     return {
@@ -124,17 +155,6 @@ function StickyArea() {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
-      <StickyNote
-        id={1}
-        isFocus={false}
-        start={{
-          x: window.innerWidth / 2 - 25,
-          y: window.innerHeight / 2 - 25,
-        }}
-        stop={{ x: window.innerWidth / 2 + 25, y: window.innerHeight / 2 + 25 }}
-        text={''}
-      />
-
       {stickyNotes.map((note: Note) => {
         return <StickyNote key={note.id} {...note} />
       })}

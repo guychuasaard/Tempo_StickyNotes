@@ -5,7 +5,7 @@ export interface Position {
 
 export interface Note {
   id: number
-  isFocus: boolean
+  isSelect: boolean
   start: Position
   stop: Position
   text: string
