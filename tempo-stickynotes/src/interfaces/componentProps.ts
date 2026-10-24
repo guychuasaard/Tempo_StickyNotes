@@ -1,3 +1,5 @@
+import type { Ref } from 'react'
+
 export interface Position {
   x: number
   y: number
@@ -9,4 +11,5 @@ export interface Note {
   start: Position
   stop: Position
   text: string
+  ref?: Ref<HTMLDivElement>
 }
