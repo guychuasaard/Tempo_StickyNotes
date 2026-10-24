@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from 'react'
+import { useState, type PointerEvent } from 'react'
 import './StickyArea.css'
 import StickyNote from '../stickyNote/StickyNote'
 import type { Note, Position } from '../../interfaces/componentProps'
@@ -17,10 +17,8 @@ const EDGE_SIZE = 8
 
 function StickyArea() {
   const [status, setStatus] = useState<Status>(Status.Idle)
+  const [focusNote, setFocusNote] = useState<Note | undefined>(undefined)
   const [stickyNotes, setStickyNotes] = useState<Note[]>([])
-
-  const focusNoteRef = useRef<Note | null>(null)
-  const stickyNoteRef = useRef<HTMLDivElement>(null)
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -28,45 +26,43 @@ function StickyArea() {
     const updatedStatus = updateStatus(event.clientX, event.clientY)
 
     if (updatedStatus === Status.Creating) {
-      const start: Position = { x: event.clientX, y: event.clientY }
-      focusNoteRef.current = {
+      const note = {
         id: Date.now(),
         isFocus: true,
-        start,
-        stop: start,
-        text: '',
-      }
+        start: {
+          x: event.clientX,
+          y: event.clientY,
+        } as Position,
+        stop: {} as Position,
+      } as Note
+      setFocusNote(note)
     }
   }
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
-    const note = focusNoteRef.current
-    const preview = stickyNoteRef.current
-    if (!note || !preview) return
-
-    note.stop = { x: event.clientX, y: event.clientY }
-
-    const left = Math.min(note.start.x, note.stop.x)
-    const top = Math.min(note.start.y, note.stop.y)
-    preview.style.transform = `translate(${left}px, ${top}px)`
-    preview.style.width = `${Math.abs(note.stop.x - note.start.x)}px`
-    preview.style.height = `${Math.abs(note.stop.y - note.start.y)}px`
+    if (focusNote) {
+      const note = focusNote
+      note.stop = {
+        x: event.clientX,
+        y: event.clientY,
+      } as Position
+    }
   }
 
-  const handlePointerUp = () => {
-    const note = focusNoteRef.current
-    focusNoteRef.current = null
+  const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    if (focusNote) {
+      const note = focusNote!
+      note.stop = {
+        x: event.clientX,
+        y: event.clientY,
+      } as Position
 
-    if (stickyNoteRef.current) {
-      stickyNoteRef.current.style.width = '0px'
-      stickyNoteRef.current.style.height = '0px'
+      if (status === Status.Creating) {
+        setStickyNotes([...stickyNotes, note])
+        setFocusNote(undefined)
+      }
     }
-
-    if (!note || status !== Status.Creating) return
-    if (note.start.x === note.stop.x || note.start.y === note.stop.y) return
-
-    setStickyNotes((prev) => [...prev, note])
   }
 
   const updateStatus = (cursorX: number, cursorY: number) => {
@@ -142,15 +138,6 @@ function StickyArea() {
       {stickyNotes.map((note: Note) => {
         return <StickyNote key={note.id} {...note} />
       })}
-
-      <StickyNote
-        ref={stickyNoteRef}
-        id={0}
-        isFocus={true}
-        start={{ x: 0, y: 0 }}
-        stop={{ x: 0, y: 0 }}
-        text={''}
-      />
     </div>
   )
 }
