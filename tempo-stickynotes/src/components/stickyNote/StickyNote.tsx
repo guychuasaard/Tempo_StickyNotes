@@ -1,10 +1,10 @@
 import type { Note } from '../../interfaces/componentProps'
 import './StickyNote.css'
 
-function StickyNote({ start, stop, isSelect }: Note) {
+function StickyNote({ start, stop, status }: Note) {
   return (
     <div
-      className={isSelect ? 'sticky-note selected' : 'sticky-note'}
+      className={`sticky-note ${status}`}
       style={{
         left: Math.min(start.x, stop.x),
         top: Math.min(start.y, stop.y),

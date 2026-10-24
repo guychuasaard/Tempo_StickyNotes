@@ -5,8 +5,13 @@
   width: 10em;
   height: 5em;
   border: 2px dotted #888;
+  border-radius: 10px;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.trash-area h1 {
+  color: #434343;
 }

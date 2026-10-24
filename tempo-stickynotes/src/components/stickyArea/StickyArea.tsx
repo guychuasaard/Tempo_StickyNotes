@@ -1,8 +1,12 @@
-import { useState, type PointerEvent } from 'react'
+import { useRef, useState, type PointerEvent } from 'react'
 import './StickyArea.css'
 import StickyNote from '../stickyNote/StickyNote'
-import type { Note, Position } from '../../interfaces/componentProps'
-import { combineOffset, getOffset } from '../utils/utils'
+import {
+  NoteStatus,
+  type Note,
+  type Position,
+} from '../../interfaces/componentProps'
+import { combineOffset, getOffset, isInside } from '../utils/utils'
 import TrashArea from '../trashArea/TrashArea'
 
 const Status = {
@@ -25,6 +29,12 @@ function StickyArea() {
   const [offSetFromFocusNoteStart, setOffSetFromFocusNoteStart] =
     useState<Position>()
 
+  const trashAreaRef = useRef<HTMLDivElement>(null)
+
+  const getTrashAreaRect = () => {
+    return trashAreaRef.current?.getBoundingClientRect()
+  }
+
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
 
@@ -37,7 +47,7 @@ function StickyArea() {
     if (updatedStatus === Status.Creating) {
       const note = {
         id: Date.now(),
-        isSelect: false,
+        status: NoteStatus.None,
         start: {
           x: event.clientX,
           y: event.clientY,
@@ -45,15 +55,15 @@ function StickyArea() {
         stop: {} as Position,
       } as Note
       setFocusNote(note)
-      setStickyNotes([...stickyNotes, note])
+      addNote(note)
     } else if (updatedStatus === Status.Resizing && allResized.length > 0) {
-      const newFocusNote = allResized[0]
-      newFocusNote.isSelect = true
+      const newFocusNote = allResized[allResized.length - 1]
+      newFocusNote.status = NoteStatus.Selected
       setFocusNote(newFocusNote)
       updateNoteByID(newFocusNote.id, newFocusNote)
     } else if (updatedStatus === Status.Moving && allFocus.length > 0) {
-      const newFocusNote = allFocus[0]
-      newFocusNote.isSelect = true
+      const newFocusNote = allFocus[allFocus.length - 1]
+      newFocusNote.status = NoteStatus.Selected
       setOffSetFromFocusNoteStart(
         getOffset({ x: event.clientX, y: event.clientY }, newFocusNote.start),
       )
@@ -73,6 +83,12 @@ function StickyArea() {
           y: event.clientY,
         })
         note.stop = combineOffset(note.start, offSetBettweenNoteStartStop)
+
+        if (isCursorInsideTrash(event.clientX, event.clientY)) {
+          note.status = NoteStatus.ToBeDeleted
+        } else {
+          note.status = NoteStatus.Selected
+        }
       } else {
         note.stop = {
           x: event.clientX,
@@ -93,11 +109,15 @@ function StickyArea() {
           x: event.clientX,
           y: event.clientY,
         } as Position
-        note.isSelect = false
-      } else if (status === Status.Moving) {
-        note.isSelect = false
+      } else if (
+        status === Status.Moving &&
+        isCursorInsideTrash(event.clientX, event.clientY)
+      ) {
+        removeNoteByID(note.id)
+        return
       }
 
+      note.status = NoteStatus.None
       updateNoteByID(focusNote.id, note)
       setFocusNote(undefined)
     }
@@ -109,6 +129,17 @@ function StickyArea() {
     if (targetIndex === -1) return
 
     allNoteClone[targetIndex] = { ...updatedNote }
+    setStickyNotes(allNoteClone)
+  }
+
+  const removeNoteByID = (targetID: number) => {
+    const allNoteClone = [...stickyNotes]
+    setStickyNotes(allNoteClone.filter((n) => n.id !== targetID))
+  }
+
+  const addNote = (note: Note) => {
+    const allNoteClone = [...stickyNotes, note]
+    allNoteClone.sort((note1, note2) => note1.id - note2.id)
     setStickyNotes(allNoteClone)
   }
 
@@ -133,18 +164,15 @@ function StickyArea() {
     cursorY: number,
   ): { allFocus: Note[]; allResized: Note[] } => {
     const allFocusNote = stickyNotes.filter((note) => {
-      if (
-        (note.start.x < cursorX && cursorX < note.stop.x) ||
-        (note.start.x > cursorX && cursorX > note.stop.x)
-      ) {
-        if (
-          (note.start.y < cursorY && cursorY < note.stop.y) ||
-          (note.start.y > cursorY && cursorY > note.stop.y)
-        ) {
-          return true
-        }
-        return false
+      const topLeft = {
+        x: Math.min(note.start.x, note.stop.x),
+        y: Math.min(note.start.y, note.stop.y),
       }
+      const size = {
+        x: Math.abs(note.stop.x - note.start.x),
+        y: Math.abs(note.stop.y - note.start.y),
+      }
+      return isInside(cursorX, cursorY, topLeft, size)
     })
 
     const allResizedNote = stickyNotes.filter((note) => {
@@ -174,6 +202,18 @@ function StickyArea() {
     }
   }
 
+  const isCursorInsideTrash = (cursorX: number, cursorY: number) => {
+    const trashArea = getTrashAreaRect()
+    if (!trashArea) return false
+
+    return isInside(
+      cursorX,
+      cursorY,
+      { x: trashArea.x, y: trashArea.y },
+      { x: trashArea.width, y: trashArea.height },
+    )
+  }
+
   return (
     <div
       className="sticky-area"
@@ -184,7 +224,7 @@ function StickyArea() {
       {stickyNotes.map((note: Note) => {
         return <StickyNote key={note.id} {...note} />
       })}
-      <TrashArea />
+      <TrashArea ref={trashAreaRef} />
     </div>
   )
 }

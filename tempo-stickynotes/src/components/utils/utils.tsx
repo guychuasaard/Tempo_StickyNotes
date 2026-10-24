@@ -13,3 +13,21 @@ export const getOffset = (start: Position, stop: Position): Position => {
     y: stop.y - start.y,
   }
 }
+
+export const isInside = (
+  cursorX: number,
+  cursorY: number,
+  targetPosition: Position,
+  targetSize: Position,
+): boolean => {
+  if (targetPosition.x < cursorX && cursorX < targetPosition.x + targetSize.x) {
+    if (
+      targetPosition.y < cursorY &&
+      cursorY < targetPosition.y + targetSize.y
+    ) {
+      return true
+    }
+  }
+
+  return false
+}

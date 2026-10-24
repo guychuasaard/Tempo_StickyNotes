@@ -9,3 +9,8 @@
 .sticky-note.selected {
   background-color: #9e9e9e;
 }
+
+.sticky-note.tobedeleted {
+  background-color: #9e9e9e;
+  border: 5px dotted #888;
+}
