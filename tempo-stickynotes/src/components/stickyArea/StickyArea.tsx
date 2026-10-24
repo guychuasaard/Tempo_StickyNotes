@@ -12,6 +12,7 @@ import {
   getOffset,
   isClick,
   isInside,
+  sortNote,
 } from '../utils/utils'
 import TrashArea from '../trashArea/TrashArea'
 
@@ -63,19 +64,29 @@ function StickyArea() {
         stop: {} as Position,
       } as Note
       setFocusNote(note)
-    } else if (updatedStatus === Status.Resizing && resizeTarget) {
-      const newFocusNote = resizeTarget
-      newFocusNote.status = NoteStatus.Selected
-      setFocusNote(newFocusNote)
-      updateNoteByID(newFocusNote.id, newFocusNote)
-    } else if (updatedStatus === Status.Moving && moveTarget) {
-      const newFocusNote = moveTarget
-      newFocusNote.status = NoteStatus.Selected
-      setOffSetFromFocusNoteStart(
-        getOffset({ x: event.clientX, y: event.clientY }, newFocusNote.start),
-      )
-      setFocusNote(newFocusNote)
-      updateNoteByID(newFocusNote.id, newFocusNote)
+    } else if (
+      (updatedStatus === Status.Resizing && resizeTarget) ||
+      (updatedStatus === Status.Moving && moveTarget)
+    ) {
+      const newFocusNote =
+        updatedStatus === Status.Resizing ? resizeTarget : moveTarget
+      if (newFocusNote) {
+        newFocusNote.status = NoteStatus.Selected
+        if (updatedStatus === Status.Moving) {
+          setOffSetFromFocusNoteStart(
+            getOffset(
+              { x: event.clientX, y: event.clientY },
+              newFocusNote.start,
+            ),
+          )
+        }
+        const cloneAllNote = [
+          ...stickyNotes.filter((n) => n.id !== newFocusNote.id),
+        ]
+        newFocusNote.id = Date.now()
+        setFocusNote(newFocusNote)
+        setStickyNotes(sortNote([...cloneAllNote, newFocusNote]))
+      }
     }
   }
 
@@ -142,6 +153,15 @@ function StickyArea() {
     }
   }
 
+  const updateNoteText = (targetID: number, text: string) => {
+    const targetNote = stickyNotes.find((n) => n.id === targetID)
+
+    if (targetNote) {
+      targetNote.text = text
+      updateNoteByID(targetID, targetNote)
+    }
+  }
+
   const updateNoteByID = (targetID: number, updatedNote: Note) => {
     const allNoteClone = [...stickyNotes]
     const targetIndex = allNoteClone.findIndex((n) => n.id === targetID)
@@ -157,9 +177,7 @@ function StickyArea() {
   }
 
   const addNote = (note: Note) => {
-    const allNoteClone = [...stickyNotes, note]
-    allNoteClone.sort((note1, note2) => note1.id - note2.id)
-    setStickyNotes(allNoteClone)
+    setStickyNotes(sortNote([...stickyNotes, note]))
   }
 
   const updateStatus = (
@@ -252,7 +270,13 @@ function StickyArea() {
       onPointerUp={handlePointerUp}
     >
       {stickyNotes.map((note: Note) => {
-        return <StickyNote key={note.id} {...note} />
+        return (
+          <StickyNote
+            key={note.id}
+            {...note}
+            updateContent={(text) => updateNoteText(note.id, text)}
+          />
+        )
       })}
       <TrashArea ref={trashAreaRef} />
     </div>

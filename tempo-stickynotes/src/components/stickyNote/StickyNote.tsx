@@ -1,9 +1,13 @@
-import { useState } from 'react'
-import type { Note } from '../../interfaces/componentProps'
+import type { StickyNoteProps } from '../../interfaces/componentProps'
 import './StickyNote.css'
 
-function StickyNote({ start, stop, status }: Note) {
-  const [content, setContent] = useState('')
+function StickyNote({
+  start,
+  stop,
+  status,
+  text,
+  updateContent,
+}: StickyNoteProps) {
   return (
     <div
       className={`sticky-note ${status}`}
@@ -16,9 +20,9 @@ function StickyNote({ start, stop, status }: Note) {
     >
       <textarea
         className={`sticky-content`}
-        value={content}
+        value={text}
         onChange={(event) => {
-          setContent(event.target.value)
+          updateContent(event.target.value)
         }}
       ></textarea>
     </div>

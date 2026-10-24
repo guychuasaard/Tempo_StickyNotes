@@ -21,6 +21,10 @@ export interface Note {
   text: string
 }
 
+export interface StickyNoteProps extends Note {
+  updateContent: (text: string) => void
+}
+
 export interface TrashAreaProps {
   ref?: Ref<HTMLDivElement>
 }

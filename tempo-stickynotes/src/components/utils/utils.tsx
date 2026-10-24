@@ -50,3 +50,7 @@ export const isClick = (
     Math.abs(cursorY - pointerDownLocation.y) <= CLICK_DISTANCE
   )
 }
+
+export const sortNote = (notes: Note[]): Note[] => {
+  return [...notes].sort((note1, note2) => note1.id - note2.id)
+}
