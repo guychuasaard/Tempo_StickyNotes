@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import './StickyArea.css'
 import StickyNote from '../stickyNote/StickyNote'
 import {
@@ -29,7 +29,10 @@ const EDGE_SIZE = 5
 
 function StickyArea() {
   const [status, setStatus] = useState<Status>(Status.Idle)
-  const [stickyNotes, setStickyNotes] = useState<Note[]>([])
+  const [stickyNotes, setStickyNotes] = useState<Note[]>(() => {
+    const data = localStorage.getItem('stickyNotes')
+    return data ? (JSON.parse(data) as Note[]) : []
+  })
 
   const [focusNote, setFocusNote] = useState<Note | undefined>(undefined)
   const [offSetFromFocusNoteStart, setOffSetFromFocusNoteStart] =
@@ -39,9 +42,9 @@ function StickyArea() {
 
   const trashAreaRef = useRef<HTMLDivElement>(null)
 
-  const getTrashAreaRect = () => {
-    return trashAreaRef.current?.getBoundingClientRect()
-  }
+  useEffect(() => {
+    localStorage.setItem('stickyNotes', JSON.stringify(stickyNotes))
+  }, [stickyNotes])
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -251,7 +254,7 @@ function StickyArea() {
   }
 
   const isCursorInsideTrash = (cursorX: number, cursorY: number) => {
-    const trashArea = getTrashAreaRect()
+    const trashArea = trashAreaRef.current?.getBoundingClientRect()
     if (!trashArea) return false
 
     return isInside(
