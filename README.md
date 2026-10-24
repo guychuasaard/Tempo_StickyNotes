@@ -41,7 +41,11 @@ There is a text area inside each note. And the text is stored in the Note list (
 ### LocalStorage Saving
 Since each note can be easily converted/parsed. Storing it in localStorage requires minimal changes (***StickyArea.tsx*** line 46) (***StickyArea.tsx*** line 34).
 
-
+## Design Decision
+- Keeping 2 edges instead of one centre point for each note: It requires less calculation as keeping centre point would require calculating top/left/right/bottom from note width/heigh. And moving would require another later of calculation (distance between mouse and centre + top right and bottom left). Also more calculation on decimal point will cause it to be less accurate (experience from Unity3D game engine).
+- Using timestamps instead of Z index: keeping index would cause complication when removing note, as other z index gets calculated.  Which add more code for no reason.
+- Dotted line when delete: At first I want to turn the note red, but that means red wouldn't be an option for note color.
+- No Transform: I plan to use transform when dragging, as it will reduce the number of render. The issue is transform require you to add ref to each note, which add a layer of complexity. I asked Ai to show how the code base look like, and I feel like implementing transform would take time away from the 4 objectives, which should be the main focus. Hence I skipped it.
 
 
 
