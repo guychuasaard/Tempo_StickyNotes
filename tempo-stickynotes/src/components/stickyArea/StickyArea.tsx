@@ -2,31 +2,36 @@ import { useState, type PointerEvent } from 'react'
 import './StickyArea.css'
 import StickyNote from '../stickyNote/StickyNote'
 import type { Note, Position } from '../../interfaces/componentProps'
+import { combineOffset, getOffset } from '../utils/utils'
 
 const Status = {
   Idle: 'idle',
   Creating: 'creating',
-  Editing: 'Editing',
+  Editing: 'editing',
   Moving: 'moving',
   Resizing: 'resizing',
 } as const
 
 type Status = (typeof Status)[keyof typeof Status]
 
-const EDGE_SIZE = 15
+const EDGE_SIZE = 10
 
 function StickyArea() {
   const [status, setStatus] = useState<Status>(Status.Idle)
-  const [focusNote, setFocusNote] = useState<Note | undefined>(undefined)
   const [stickyNotes, setStickyNotes] = useState<Note[]>([])
+
+  const [focusNote, setFocusNote] = useState<Note | undefined>(undefined)
+  const [offSetFromFocusNoteStart, setOffSetFromFocusNoteStart] =
+    useState<Position>()
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
 
-    const { status: updatedStatus, allResized } = updateStatus(
-      event.clientX,
-      event.clientY,
-    )
+    const {
+      status: updatedStatus,
+      allResized,
+      allFocus,
+    } = updateStatus(event.clientX, event.clientY)
 
     if (updatedStatus === Status.Creating) {
       const note = {
@@ -44,6 +49,14 @@ function StickyArea() {
       newFocusNote.isSelect = true
       setFocusNote(newFocusNote)
       updateNoteByID(newFocusNote.id, newFocusNote)
+    } else if (updatedStatus === Status.Moving && allFocus.length > 0) {
+      const newFocusNote = allFocus[0]
+      newFocusNote.isSelect = true
+      setOffSetFromFocusNoteStart(
+        getOffset({ x: event.clientX, y: event.clientY }, newFocusNote.start),
+      )
+      setFocusNote(newFocusNote)
+      updateNoteByID(newFocusNote.id, newFocusNote)
     }
   }
 
@@ -51,10 +64,21 @@ function StickyArea() {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
     if (focusNote) {
       const note = focusNote
-      note.stop = {
-        x: event.clientX,
-        y: event.clientY,
-      } as Position
+      if (status === Status.Moving) {
+        const offSetBettweenNoteStartStop = getOffset(note.start, note.stop)
+        note.start = combineOffset(offSetFromFocusNoteStart!, {
+          x: event.clientX,
+          y: event.clientY,
+        })
+        note.stop = combineOffset(note.start, offSetBettweenNoteStartStop)
+      } else {
+        note.stop = {
+          x: event.clientX,
+          y: event.clientY,
+        } as Position
+      }
+      setFocusNote(note)
+      updateNoteByID(note.id, note)
     }
   }
 
