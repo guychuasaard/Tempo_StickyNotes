@@ -3,6 +3,7 @@ import './StickyArea.css'
 import StickyNote from '../stickyNote/StickyNote'
 import type { Note, Position } from '../../interfaces/componentProps'
 import { combineOffset, getOffset } from '../utils/utils'
+import TrashArea from '../trashArea/TrashArea'
 
 const Status = {
   Idle: 'idle',
@@ -14,7 +15,7 @@ const Status = {
 
 type Status = (typeof Status)[keyof typeof Status]
 
-const EDGE_SIZE = 10
+const EDGE_SIZE = 5
 
 function StickyArea() {
   const [status, setStatus] = useState<Status>(Status.Idle)
@@ -44,6 +45,7 @@ function StickyArea() {
         stop: {} as Position,
       } as Note
       setFocusNote(note)
+      setStickyNotes([...stickyNotes, note])
     } else if (updatedStatus === Status.Resizing && allResized.length > 0) {
       const newFocusNote = allResized[0]
       newFocusNote.isSelect = true
@@ -85,19 +87,19 @@ function StickyArea() {
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
     if (focusNote) {
       const note = focusNote!
-      note.stop = {
-        x: event.clientX,
-        y: event.clientY,
-      } as Position
 
-      if (status === Status.Creating) {
-        setStickyNotes([...stickyNotes, note])
-        setFocusNote(undefined)
-      } else if (status === Status.Resizing) {
+      if (status === Status.Creating || status === Status.Resizing) {
+        note.stop = {
+          x: event.clientX,
+          y: event.clientY,
+        } as Position
         note.isSelect = false
-        updateNoteByID(focusNote.id, note)
-        setFocusNote(undefined)
+      } else if (status === Status.Moving) {
+        note.isSelect = false
       }
+
+      updateNoteByID(focusNote.id, note)
+      setFocusNote(undefined)
     }
   }
 
@@ -182,6 +184,7 @@ function StickyArea() {
       {stickyNotes.map((note: Note) => {
         return <StickyNote key={note.id} {...note} />
       })}
+      <TrashArea />
     </div>
   )
 }

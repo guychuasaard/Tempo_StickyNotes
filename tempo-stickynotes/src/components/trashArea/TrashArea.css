@@ -1,0 +1,12 @@
+.trash-area {
+  position: absolute;
+  bottom: 1em;
+  left: 1em;
+  width: 10em;
+  height: 5em;
+  border: 2px dotted #888;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
