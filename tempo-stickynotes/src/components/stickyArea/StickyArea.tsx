@@ -6,13 +6,18 @@ import {
   type Note,
   type Position,
 } from '../../interfaces/componentProps'
-import { combineOffset, getOffset, isInside } from '../utils/utils'
+import {
+  combineOffset,
+  getLatestNote,
+  getOffset,
+  isClick,
+  isInside,
+} from '../utils/utils'
 import TrashArea from '../trashArea/TrashArea'
 
 const Status = {
   Idle: 'idle',
   Creating: 'creating',
-  Editing: 'editing',
   Moving: 'moving',
   Resizing: 'resizing',
 } as const
@@ -29,6 +34,8 @@ function StickyArea() {
   const [offSetFromFocusNoteStart, setOffSetFromFocusNoteStart] =
     useState<Position>()
 
+  const [pointerDownLocation, setPointerDownLocation] = useState<Position>()
+
   const trashAreaRef = useRef<HTMLDivElement>(null)
 
   const getTrashAreaRect = () => {
@@ -37,11 +44,12 @@ function StickyArea() {
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
+    setPointerDownLocation({ x: event.clientX, y: event.clientY })
 
     const {
       status: updatedStatus,
-      allResized,
-      allFocus,
+      resizedNote: resizeTarget,
+      focusNote: moveTarget,
     } = updateStatus(event.clientX, event.clientY)
 
     if (updatedStatus === Status.Creating) {
@@ -55,14 +63,13 @@ function StickyArea() {
         stop: {} as Position,
       } as Note
       setFocusNote(note)
-      addNote(note)
-    } else if (updatedStatus === Status.Resizing && allResized.length > 0) {
-      const newFocusNote = allResized[allResized.length - 1]
+    } else if (updatedStatus === Status.Resizing && resizeTarget) {
+      const newFocusNote = resizeTarget
       newFocusNote.status = NoteStatus.Selected
       setFocusNote(newFocusNote)
       updateNoteByID(newFocusNote.id, newFocusNote)
-    } else if (updatedStatus === Status.Moving && allFocus.length > 0) {
-      const newFocusNote = allFocus[allFocus.length - 1]
+    } else if (updatedStatus === Status.Moving && moveTarget) {
+      const newFocusNote = moveTarget
       newFocusNote.status = NoteStatus.Selected
       setOffSetFromFocusNoteStart(
         getOffset({ x: event.clientX, y: event.clientY }, newFocusNote.start),
@@ -74,8 +81,21 @@ function StickyArea() {
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
-    if (focusNote) {
+
+    if (
+      !isClick(event.clientX, event.clientY, pointerDownLocation) &&
+      focusNote
+    ) {
       const note = focusNote
+      if (status === Status.Creating) {
+        note.stop = {
+          x: event.clientX,
+          y: event.clientY,
+        } as Position
+        if (stickyNotes.findIndex((n) => n.id === focusNote.id) === -1) {
+          addNote(note)
+        }
+      }
       if (status === Status.Moving) {
         const offSetBettweenNoteStartStop = getOffset(note.start, note.stop)
         note.start = combineOffset(offSetFromFocusNoteStart!, {
@@ -109,12 +129,11 @@ function StickyArea() {
           x: event.clientX,
           y: event.clientY,
         } as Position
-      } else if (
-        status === Status.Moving &&
-        isCursorInsideTrash(event.clientX, event.clientY)
-      ) {
-        removeNoteByID(note.id)
-        return
+      } else if (status === Status.Moving) {
+        if (isCursorInsideTrash(event.clientX, event.clientY)) {
+          removeNoteByID(note.id)
+          return
+        }
       }
 
       note.status = NoteStatus.None
@@ -146,13 +165,17 @@ function StickyArea() {
   const updateStatus = (
     cursorX: number,
     cursorY: number,
-  ): { status: Status; allFocus: Note[]; allResized: Note[] } => {
+  ): {
+    status: Status
+    focusNote: Note | undefined
+    resizedNote: Note | undefined
+  } => {
     const targetingResult = identifyNote(cursorX, cursorY)
     let newStatus: Status = Status.Creating
 
-    if (targetingResult.allResized.length > 0) {
+    if (targetingResult.resizedNote) {
       newStatus = Status.Resizing
-    } else if (targetingResult.allFocus.length > 0) {
+    } else if (targetingResult.focusNote) {
       newStatus = Status.Moving
     }
     setStatus(newStatus)
@@ -162,43 +185,50 @@ function StickyArea() {
   const identifyNote = (
     cursorX: number,
     cursorY: number,
-  ): { allFocus: Note[]; allResized: Note[] } => {
-    const allFocusNote = stickyNotes.filter((note) => {
-      const topLeft = {
-        x: Math.min(note.start.x, note.stop.x),
-        y: Math.min(note.start.y, note.stop.y),
-      }
-      const size = {
-        x: Math.abs(note.stop.x - note.start.x),
-        y: Math.abs(note.stop.y - note.start.y),
-      }
-      return isInside(cursorX, cursorY, topLeft, size)
-    })
+  ): { focusNote: Note | undefined; resizedNote: Note | undefined } => {
+    const focusNote = getLatestNote(
+      stickyNotes.filter((note) => {
+        const topLeft = {
+          x: Math.min(note.start.x, note.stop.x),
+          y: Math.min(note.start.y, note.stop.y),
+        }
+        const size = {
+          x: Math.abs(note.stop.x - note.start.x),
+          y: Math.abs(note.stop.y - note.start.y),
+        }
+        return isInside(cursorX, cursorY, topLeft, size)
+      }),
+    )
 
-    const allResizedNote = stickyNotes.filter((note) => {
-      const left = Math.min(note.start.x, note.stop.x)
-      const right = Math.max(note.start.x, note.stop.x)
-      const top = Math.min(note.start.y, note.stop.y)
-      const bottom = Math.max(note.start.y, note.stop.y)
+    const resizedNote = getLatestNote(
+      stickyNotes.filter((note) => {
+        const left = Math.min(note.start.x, note.stop.x)
+        const right = Math.max(note.start.x, note.stop.x)
+        const top = Math.min(note.start.y, note.stop.y)
+        const bottom = Math.max(note.start.y, note.stop.y)
 
-      const inOuterBox =
-        cursorX >= left - EDGE_SIZE &&
-        cursorX <= right + EDGE_SIZE &&
-        cursorY >= top - EDGE_SIZE &&
-        cursorY <= bottom + EDGE_SIZE
+        const inOuterBox =
+          cursorX >= left - EDGE_SIZE &&
+          cursorX <= right + EDGE_SIZE &&
+          cursorY >= top - EDGE_SIZE &&
+          cursorY <= bottom + EDGE_SIZE
 
-      const inInnerBox =
-        cursorX > left + EDGE_SIZE &&
-        cursorX < right - EDGE_SIZE &&
-        cursorY > top + EDGE_SIZE &&
-        cursorY < bottom - EDGE_SIZE
+        const inInnerBox =
+          cursorX > left + EDGE_SIZE &&
+          cursorX < right - EDGE_SIZE &&
+          cursorY > top + EDGE_SIZE &&
+          cursorY < bottom - EDGE_SIZE
 
-      return inOuterBox && !inInnerBox
-    })
+        return inOuterBox && !inInnerBox
+      }),
+    )
 
     return {
-      allFocus: allFocusNote,
-      allResized: allResizedNote,
+      focusNote: focusNote,
+      resizedNote:
+        focusNote && resizedNote && focusNote.id > resizedNote.id
+          ? undefined
+          : resizedNote,
     }
   }
 

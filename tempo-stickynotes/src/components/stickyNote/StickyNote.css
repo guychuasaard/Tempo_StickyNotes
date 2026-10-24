@@ -4,6 +4,7 @@
   border: 5px solid #333;
   border-radius: 10px;
   box-sizing: border-box;
+  align-content: center;
 }
 
 .sticky-note.selected {
@@ -13,4 +14,20 @@
 .sticky-note.tobedeleted {
   background-color: #9e9e9e;
   border: 5px dotted #888;
+}
+
+.sticky-content {
+  all: unset;
+  display: block;
+  color: black;
+  margin: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  font-size: 1rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  touch-action: pan-y;
+  align-content: center;
 }

@@ -1,4 +1,6 @@
-import type { Position } from '../../interfaces/componentProps'
+import type { Note, Position } from '../../interfaces/componentProps'
+
+export const CLICK_DISTANCE = 5
 
 export const combineOffset = (target: Position, offset: Position): Position => {
   return {
@@ -30,4 +32,21 @@ export const isInside = (
   }
 
   return false
+}
+
+export const getLatestNote = (notes: Note[]): Note | undefined => {
+  if (notes.length === 0) return undefined
+  return notes.reduce((latest, note) => (note.id > latest.id ? note : latest))
+}
+
+export const isClick = (
+  cursorX: number,
+  cursorY: number,
+  pointerDownLocation: Position | undefined,
+): boolean => {
+  return (
+    pointerDownLocation !== undefined &&
+    Math.abs(cursorX - pointerDownLocation.x) <= CLICK_DISTANCE &&
+    Math.abs(cursorY - pointerDownLocation.y) <= CLICK_DISTANCE
+  )
 }
